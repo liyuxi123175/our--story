@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#050505">
+<title>Our Story</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#000; overflow:hidden; width:100vw; height:100vh; cursor:none; }
+  #c { position:fixed; inset:0; display:block; }
+
+  #cursor { position:fixed; width:8px; height:8px; border-radius:50%; background:#ff6b6b;
+    pointer-events:none; z-index:9999; transform:translate(-50%,-50%);
+    box-shadow:0 0 12px #ff6b6b, 0 0 24px rgba(255,107,107,.5); }
+
+  #title { position:fixed; z-index:10; pointer-events:none;
+    top:5%; left:50%; transform:translateX(-50%); text-align:center; }
+  #title h1 { font-family:'Georgia',serif; font-size:clamp(20px,3vw,36px); font-weight:300;
+    letter-spacing:10px; color:rgba(255,255,255,.9); text-shadow:0 0 40px rgba(255,80,80,.5); }
+  #title p  { font-family:monospace; font-size:9px; letter-spacing:6px;
+    color:rgba(255,255,255,.28); margin-top:6px; }
+
+  /* Camera panel — top left */
+  #camArea { position:fixed; top:20px; left:20px; z-index:15; }
+  #camBtn  { display:block; background:transparent; border:1px solid rgba(255,107,80,.3);
+    border-radius:6px; padding:6px 14px; color:rgba(255,255,255,.4);
+    font-family:monospace; font-size:8px; letter-spacing:3px;
+    cursor:pointer; transition:all .3s; pointer-events:auto; }
+  #camBtn:hover { border-color:rgba(255,107,80,.6); color:#ff6b6b; }
+  #camBtn.on    { border-color:#ff6b6b; color:#ff6b6b; box-shadow:0 0 16px rgba(255,107,80,.2); }
+  #camPanel     { display:none; margin-top:8px; }
+  #camPanel.on  { display:block; }
+  #camWrap      { position:relative; width:160px; height:120px; }
+  #camVideo     { width:160px; height:120px; object-fit:cover; border-radius:6px;
+    border:1px solid rgba(255,107,80,.2); transform:scaleX(-1); display:block; }
+  #handCanvas   { position:absolute; inset:0; border-radius:6px; pointer-events:none; transform:scaleX(-1); }
+  #gLabel       { margin-top:5px; font-family:monospace; font-size:8px; letter-spacing:3px;
+    color:rgba(255,107,80,.8); text-align:center; min-height:14px; }
+
+  /* Scatter / Gather buttons — bottom center */
+  #controls { position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
+    z-index:15; display:flex; gap:16px; }
+  #controls button { background:transparent; border:1px solid rgba(255,255,255,.2);
+    border-radius:30px; padding:8px 28px; color:rgba(255,255,255,.35);
+    font-family:monospace; font-size:9px; letter-spacing:5px;
+    cursor:pointer; transition:all .3s; pointer-events:auto; }
+  #controls button:hover { border-color:rgba(255,107,80,.6); color:#ff6b6b; }
+  #controls button.active { border-color:#ff6b6b; color:#ff6b6b;
+    background:rgba(255,107,80,.07); box-shadow:0 0 20px rgba(255,107,80,.2); }
+
+  #hint { position:fixed; bottom:8px; left:50%; transform:translateX(-50%);
+    z-index:10; pointer-events:none; font-family:monospace; font-size:8px;
+    letter-spacing:2px; color:rgba(255,255,255,.16); white-space:nowrap; }
+
+  #siteNote { position:fixed; right:20px; top:20px; z-index:15; max-width:min(300px, 42vw);
+    padding:9px 11px; border:1px solid rgba(255,255,255,.12); border-radius:10px;
+    background:rgba(0,0,0,.32); backdrop-filter:blur(10px); color:rgba(255,255,255,.62);
+    font-family:monospace; font-size:10px; line-height:1.5; letter-spacing:1px; }
+  #siteNote strong { color:rgba(255,255,255,.88); font-weight:400; }
+
+  /* Photo overlay */
+  #overlay { position:fixed; inset:0; z-index:100; display:flex; align-items:center;
+    justify-content:center; background:transparent; pointer-events:none; transition:background .4s; }
+  #overlay.show { background:rgba(0,0,0,.93); backdrop-filter:blur(26px); pointer-events:auto; }
+  #oInner  { transform:scale(0); transition:transform .45s cubic-bezier(.16,1,.3,1); }
+  #overlay.show #oInner { transform:scale(1); }
+  #oFrame  { background:#fff; padding:14px 14px 38px; display:inline-block;
+    box-shadow:0 20px 80px rgba(0,0,0,.8); }
+  #oImg    { max-width:80vw; max-height:76vh; object-fit:contain; display:block; }
+  #oCtr    { font-family:monospace; font-size:8px; letter-spacing:4px;
+    color:#aaa; text-align:center; margin-top:8px; }
+
+  @media (hover: none), (pointer: coarse) {
+    body { cursor:auto; }
+    #cursor { display:none; }
+    #title { top:4%; width:90vw; }
+    #title h1 { letter-spacing:7px; }
+    #title p { letter-spacing:4px; }
+    #camArea { top:12px; left:12px; }
+    #controls { bottom:18px; gap:10px; width:92vw; }
+    #controls button { flex:1; padding:10px 14px; font-size:10px; letter-spacing:3px; }
+    #hint { bottom:72px; width:min(92vw, 420px); white-space:normal; text-align:center; line-height:1.8; }
+    #siteNote { top:auto; right:50%; bottom:122px; transform:translateX(50%); max-width:min(92vw, 420px); }
+    #oFrame { padding:10px 10px 28px; }
+    #oImg { max-width:88vw; max-height:68vh; }
+  }
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<canvas id="c"></canvas>
+
+<div id="title">
+  <h1>X &nbsp;♡&nbsp; C</h1>
+  <p>O U R &nbsp;&nbsp; S T O R Y</p>
+</div>
+
+<div id="siteNote"><strong>打开方式</strong><br>电脑可直接访问本地网站；手机与电脑同一 Wi‑Fi 下可通过局域网地址打开。手势摄像头需要 HTTPS 或 localhost。</div>
+
+<div id="camArea">
+  <button id="camBtn">GESTURE</button>
+  <div id="camPanel">
+    <div id="camWrap">
+      <video id="camVideo" autoplay muted playsinline></video>
+      <canvas id="handCanvas"></canvas>
+    </div>
+    <div id="gLabel">点击开启</div>
+  </div>
+</div>
+
+<div id="controls">
+  <button id="scatterBtn">散开</button>
+  <button id="gatherBtn" class="active">聚合</button>
+</div>
+<div id="hint">✋ 开手散开 &nbsp;·&nbsp; ✊ 握拳聚合 &nbsp;·&nbsp; ✌️ 比耶放大 &nbsp;·&nbsp; 🖐️ 三指换图 &nbsp;·&nbsp; ✊ 握拳关图</div>
+
+<div id="overlay">
+  <div id="oInner">
+    <div id="oFrame"><img id="oImg" src="" alt=""></div>
+    <div id="oCtr"></div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import { HandLandmarker, FilesetResolver, DrawingUtils }
+  from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
+
+// ── Photos ─────────────────────────────────────────────
+const photos = [
+  'photos/d4a8e2e9cf6ae8eea41090cf58bc0f38.jpg',
+  'photos/a7a2cead0dbb71dbbe1587a5b7d5a2d1.jpg',
+  'photos/bfee02487e479f86135e119b9694f253.jpg',
+  'photos/a4235c5be6c41cde0e52319c463c1a69.jpg',
+  'photos/9182c4f2b9d88854d9618a0e65069340.jpg',
+  'photos/b58b3d7ab697e8e4e933578f6fa67b54.jpg',
+  'photos/2e7913afe10df3491e5b85893d402b26.jpg',
+  'photos/c5c175a778351faeeb560526c31bd0d6.jpg',
+  'photos/ee84d05dcf96bc6bc6882642ffedc7c9.jpg',
+  'photos/6c22e0d0190aa73f82426fd3ae6f1f1f.jpg',
+  'photos/ed1e0cfe1be2f6036fd8db7c6916bac7.jpg',
+  'photos/97977e40011dc56fdf140fd076663b48.jpg',
+  'photos/8fd08754a5012d0f848d6aea74410e37.jpg',
+  'photos/f8f1a8f6e7a9f3ad42adf723f26049b6.jpg',
+  'photos/88cc2aa4ff60bedc57ec6594df262f92.jpg',
+  'photos/0e7fae009f0807bc14ad4c53e5c9eac6.jpg',
+  'photos/a01348a4a1410046ca15d74f59f2ee5b.jpg',
+  'photos/51c4c2cc73677693cec21452144c7e42.jpg',
+  'photos/f97a855f3675912207004e003c2104c9.jpg',
+  'photos/60955fc8c4497608a487c98bdac2c3c4.jpg',
+  'photos/7fea37291b572b2c86504188c226850b.jpg',
+  'photos/d24cf2dfbb8d010d87d0b283234dfba9.jpg',
+];
+
+// ── Renderer ───────────────────────────────────────────
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.35;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+scene.fog = new THREE.FogExp2(0x000000, 0.0045);
+
+const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.1, 500);
+camera.position.set(0, 10, 80);
+scene.add(camera);
+
+// ── Lighting ───────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0x0d0000, 5));
+
+// Core glow — brightens the dense cluster from inside
+const coreLight = new THREE.PointLight(0xff2200, 14, 70);
+coreLight.position.set(0, 0, 0);
+scene.add(coreLight);
+
+// Camera follow light
+const camLight = new THREE.PointLight(0xff4400, 3, 60);
+camera.add(camLight);
+
+// Extra fill lights
+[[ 45,25, 25],[-45,25, 25],[0, 45,-25],[0,-30, 30]].forEach(([x,y,z])=>{
+  const l = new THREE.PointLight(0xff1100, 2, 110);
+  l.position.set(x,y,z); scene.add(l);
+});
+
+// ── Shared geometry ────────────────────────────────────
+// Petal shape: teardrop outline extruded thin
+const petalShape = new THREE.Shape();
+petalShape.moveTo(0, -0.9);
+petalShape.bezierCurveTo(0.55,-0.3, 0.65,0.35, 0,1.0);
+petalShape.bezierCurveTo(-0.65,0.35, -0.55,-0.3, 0,-0.9);
+const gPetal  = new THREE.ShapeGeometry(petalShape, 8);
+const gPetalL = new THREE.ShapeGeometry(petalShape, 6);
+const gSphere = new THREE.SphereGeometry(1, 10, 7);
+
+const mats = [
+  new THREE.MeshStandardMaterial({color:0xcc2233,emissive:0x440011,metalness:.1,roughness:.55,side:THREE.DoubleSide}), // 0 rose
+  new THREE.MeshStandardMaterial({color:0xff3355,emissive:0x550011,metalness:.05,roughness:.5,side:THREE.DoubleSide}), // 1 bright rose
+  new THREE.MeshStandardMaterial({color:0xdd2240,emissive:0x33000a,metalness:.1,roughness:.5,side:THREE.DoubleSide}),  // 2 deep rose
+  new THREE.MeshStandardMaterial({color:0xff5566,emissive:0x550022,metalness:.05,roughness:.5,side:THREE.DoubleSide}), // 3 pink
+  new THREE.MeshStandardMaterial({color:0xcc3344,emissive:0x330011,metalness:.15,roughness:.55,side:THREE.DoubleSide}),// 4 dark rose
+  new THREE.MeshStandardMaterial({color:0xff7788,emissive:0x440022,metalness:.05,roughness:.48,side:THREE.DoubleSide}),// 5 light pink
+  // Small filler spheres (accent)
+  new THREE.MeshStandardMaterial({color:0xff2244,emissive:0x550011,metalness:.1,roughness:.4}),                        // 6 red sphere
+];
+
+// ── Heart-shape test (2D in x-y plane, thin in z) ────
+// Unit heart: (x²+y²-1)³ ≤ x²y³, fits x:[-1,1], y:[-1.25,1.05]
+function inHeart(x, y) {
+  const nx = x / GATHER_R;
+  const ny = y / GATHER_R + 0.12;
+  const a  = nx*nx + ny*ny - 1;
+  return a*a*a <= nx*nx * ny*ny*ny;
+}
+
+// ── Build petals ──────────────────────────────────────
+const ORB_N       = 500;
+const GATHER_R    = 35;   // heart size (bigger, more obvious)
+const SCATTER_MIN = 65;
+const SCATTER_MAX = 175;
+
+const orbMeshes = [];
+const orbData   = [];
+
+for(let i=0; i<ORB_N; i++){
+  const r = Math.random();
+  let mat, size, geo;
+  if      (r<.25){mat=mats[0]; geo=gPetal;  size=Math.random()*1.8+.7;}
+  else if (r<.50){mat=mats[1]; geo=gPetal;  size=Math.random()*1.5+.6;}
+  else if (r<.68){mat=mats[2]; geo=gPetal;  size=Math.random()*2.0+.8;}
+  else if (r<.80){mat=mats[3]; geo=gPetalL; size=Math.random()*1.4+.5;}
+  else if (r<.88){mat=mats[4]; geo=gPetal;  size=Math.random()*1.6+.6;}
+  else if (r<.94){mat=mats[5]; geo=gPetalL; size=Math.random()*1.2+.4;}
+  else           {mat=mats[6]; geo=gSphere; size=Math.random()*.55+.18;}
+
+  const grp = new THREE.Group();
+  grp.add(new THREE.Mesh(geo, mat));
+
+  // Gather: rejection sampling inside a heart shape
+  let gx, gy, gz, _t=0;
+  do {
+    gx = (Math.random()*2-1) * GATHER_R;
+    gy = (Math.random()*2.5-1.2) * GATHER_R;
+    gz = (Math.random()*2-1) * GATHER_R * 0.32;
+    _t++;
+  } while(!inHeart(gx, gy) && _t < 80);
+  const gPos = new THREE.Vector3(gx, gy, gz);
+
+  // Scatter: spread shell
+  const sPhi = Math.acos(2*Math.random()-1);
+  const sTh  = Math.random()*Math.PI*2;
+  const sR   = Math.random()*(SCATTER_MAX-SCATTER_MIN)+SCATTER_MIN;
+  const sPos = new THREE.Vector3(
+    sR*Math.sin(sPhi)*Math.cos(sTh),
+    sR*Math.sin(sPhi)*Math.sin(sTh)*0.65,
+    sR*Math.cos(sPhi)
+  );
+
+  grp.position.copy(gPos);
+  grp.scale.setScalar(size);
+  grp.rotation.set(Math.random()*6, Math.random()*6, Math.random()*6);
+  grp.userData.rs = new THREE.Vector3(
+    (Math.random()-.5)*.009,
+    (Math.random()-.5)*.007,
+    (Math.random()-.5)*.005
+  );
+  scene.add(grp);
+  orbMeshes.push(grp);
+  orbData.push({ gPos, sPos, tPos: gPos.clone() });
+}
+
+// ── Photo polaroids ────────────────────────────────────
+const txLoader    = new THREE.TextureLoader();
+const photoGroups = [];
+const PHOTO_R     = 42;   // gather orbit radius (just outside heart)
+const PHOTO_S_MIN = 50;
+const PHOTO_S_MAX = 100;
+
+photos.forEach((src, i)=>{
+  const angle = (i/photos.length)*Math.PI*2;
+
+  const back = new THREE.Mesh(
+    new THREE.PlaneGeometry(8,9.5),
+    new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide})
+  );
+  const tx = txLoader.load(src);
+  tx.colorSpace = THREE.SRGBColorSpace;
+  const face = new THREE.Mesh(
+    new THREE.PlaneGeometry(7,7),
+    new THREE.MeshBasicMaterial({map:tx,side:THREE.DoubleSide})
+  );
+  face.position.set(0,.4,.02);
+
+  const grp = new THREE.Group();
+  grp.add(back); grp.add(face);
+
+  const phi  = Math.acos(2*Math.random()-1);
+  const theta = (i/photos.length)*Math.PI*2 + (Math.random()-.5)*.6;
+  const r     = PHOTO_R + (Math.random()-.5)*6;
+  const gPos = new THREE.Vector3(
+    r*Math.sin(phi)*Math.cos(theta),
+    r*Math.sin(phi)*Math.sin(theta)*0.6,
+    r*Math.cos(phi)
+  );
+  const sPhi = Math.acos(2*Math.random()-1);
+  const sTh  = Math.random()*Math.PI*2;
+  const sR   = Math.random()*(PHOTO_S_MAX-PHOTO_S_MIN)+PHOTO_S_MIN;
+  const sPos = new THREE.Vector3(
+    sR*Math.sin(sPhi)*Math.cos(sTh),
+    sR*Math.sin(sPhi)*Math.sin(sTh)*.65,
+    sR*Math.cos(sPhi)
+  );
+
+  const rz = (Math.random()-.5)*.55;
+  grp.position.copy(gPos);
+  grp.rotation.z = rz;
+  grp.userData = {
+    idx:i, src,
+    gPos: gPos.clone(), sPos: sPos.clone(), tPos: gPos.clone(),
+    baseRz: rz, phase: Math.random()*Math.PI*2,
+  };
+  scene.add(grp);
+  photoGroups.push(grp);
+});
+
+// ── App state ──────────────────────────────────────────
+let scattered  = false;
+let currentIdx = 0;
+let overlayOpen= false;
+let overlayZoom   = 1.0;
+let targetOZoom   = 1.0;
+
+const overlayEl = document.getElementById('overlay');
+const oImg      = document.getElementById('oImg');
+const oCtr      = document.getElementById('oCtr');
+const oInner    = document.getElementById('oInner');
+const siteNote  = document.getElementById('siteNote');
+
+function showPhoto(idx){
+  currentIdx = ((idx%photos.length)+photos.length)%photos.length;
+  oImg.src   = photos[currentIdx];
+  oCtr.textContent = `${String(currentIdx+1).padStart(2,'0')} / ${String(photos.length).padStart(2,'0')}`;
+  overlayEl.classList.add('show');
+  overlayOpen = true;
+}
+function hidePhoto(){ overlayEl.classList.remove('show'); overlayOpen=false; targetOZoom=1.0; overlayZoom=1.0; oInner.style.transform='scale(1)'; }
+function nextPhoto(){ hidePhoto(); setTimeout(()=>showPhoto(currentIdx+1), 300); }
+
+overlayEl.addEventListener('click', e=>{ if(e.target!==oImg) hidePhoto(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') hidePhoto(); });
+
+// ── Scatter / Gather ───────────────────────────────────
+function setGather(){
+  if(!scattered) return;
+  scattered = false;
+  orbData.forEach(d=>{ d.tPos = d.gPos.clone(); });
+  photoGroups.forEach(g=>{ g.userData.tPos = g.userData.gPos.clone(); });
+  coreLight.intensity = 14;
+  document.getElementById('gatherBtn').classList.add('active');
+  document.getElementById('scatterBtn').classList.remove('active');
+}
+function setScatter(){
+  if(scattered) return;
+  scattered = true;
+  orbData.forEach(d=>{ d.tPos = d.sPos.clone(); });
+  photoGroups.forEach(g=>{ g.userData.tPos = g.userData.sPos.clone(); });
+  coreLight.intensity = 2;
+  document.getElementById('scatterBtn').classList.add('active');
+  document.getElementById('gatherBtn').classList.remove('active');
+}
+
+document.getElementById('gatherBtn').addEventListener('click', setGather);
+document.getElementById('scatterBtn').addEventListener('click', setScatter);
+
+// ── Resize ─────────────────────────────────────────────
+window.addEventListener('resize', ()=>{
+  renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+// ── Cursor ─────────────────────────────────────────────
+const cursorEl = document.getElementById('cursor');
+document.addEventListener('mousemove', e=>{
+  cursorEl.style.left = e.clientX+'px';
+  cursorEl.style.top  = e.clientY+'px';
+});
+
+// ── Click-to-open photos ───────────────────────────────
+const raycaster = new THREE.Raycaster();
+const mouse2    = new THREE.Vector2();
+document.addEventListener('click', e=>{
+  if(overlayOpen) return;
+  mouse2.set((e.clientX/innerWidth)*2-1, -(e.clientY/innerHeight)*2+1);
+  raycaster.setFromCamera(mouse2, camera);
+  const hits = raycaster.intersectObjects(photoGroups.map(g=>g.children[0]));
+  if(hits.length) showPhoto(hits[0].object.parent.userData.idx);
+});
+
+// ── Render loop ────────────────────────────────────────
+let tick = 0, camTheta = 0;
+function animate(){
+  requestAnimationFrame(animate);
+  tick++;
+
+  camTheta += 0.0004;
+  // ±40° left-right sway around origin
+  const camAngle = Math.sin(camTheta * 0.28) * (40 * Math.PI / 180);
+  camera.position.set(
+    Math.sin(camAngle) * 80,
+    10 + Math.sin(camTheta * 0.17) * 5,
+    Math.cos(camAngle) * 80
+  );
+  camera.lookAt(0, 0, 0);
+
+  for(let i=0; i<ORB_N; i++){
+    orbMeshes[i].position.lerp(orbData[i].tPos, 0.028);
+    orbMeshes[i].rotation.x += orbMeshes[i].userData.rs.x;
+    orbMeshes[i].rotation.y += orbMeshes[i].userData.rs.y;
+  }
+
+  photoGroups.forEach(g=>{
+    g.position.lerp(g.userData.tPos, 0.032);
+    g.position.y += Math.sin(tick*.008+g.userData.phase)*.008;
+    // Free-floating in scene, ±30° left-right sway
+    g.rotation.x  = Math.sin(tick*.006 + g.userData.phase) * 0.08;
+    g.rotation.y  = Math.sin(tick*.003 + g.userData.idx*.5) * 0.524;
+    g.rotation.z  = g.userData.baseRz + Math.sin(tick*.004 + g.userData.idx) * 0.04;
+  });
+
+  renderer.render(scene, camera);
+}
+animate();
+
+// ── MediaPipe Hand Landmarker ──────────────────────────
+const camBtn    = document.getElementById('camBtn');
+const camPanel  = document.getElementById('camPanel');
+const camVideo  = document.getElementById('camVideo');
+const handCanvas= document.getElementById('handCanvas');
+const gLabel    = document.getElementById('gLabel');
+const canUseCamera = window.isSecureContext && !!navigator.mediaDevices?.getUserMedia;
+
+function updateSiteNote(){
+  if(location.protocol === 'file:'){
+    siteNote.innerHTML = '<strong>先启动本地网站</strong><br>请用本地服务器打开，不要直接双击 HTML。电脑可访问 localhost；手机可访问电脑局域网地址。';
+    return;
+  }
+
+  siteNote.innerHTML = canUseCamera
+    ? '<strong>可直接浏览</strong><br>点击或轻触照片可放大。当前环境支持手势摄像头，授权后即可使用。'
+    : '<strong>可直接浏览</strong><br>点击或轻触照片可放大。当前环境不支持手势摄像头，请改用 localhost 或 HTTPS。';
+}
+
+updateSiteNote();
+
+let landmarker=null, camActive=false, rafId=null;
+let drawUtils=null;
+let isVSign=false, vSignCool=false;
+
+// Gesture debounce with frame-count hold
+const HOLD_FRAMES = 10;       // must hold gesture ~0.33s before trigger
+const DEAD_ZONE   = 0.07;     // normalized dead zone for finger extension
+let gState  = { name:'none', frames:0, fired:false };
+let coolUntil = 0;            // timestamp cooldown after trigger
+
+async function initLandmarker(){
+  gLabel.textContent = '加载模型…';
+  try {
+    const vision = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
+    );
+    landmarker = await HandLandmarker.createFromOptions(vision, {
+      baseOptions:{
+        modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+        delegate:'GPU'
+      },
+      runningMode:'VIDEO', numHands:1
+    });
+    gLabel.textContent = '等待手势…';
+  } catch(e){ gLabel.textContent='加载失败'; console.error(e); }
+}
+
+function drawHand(result){
+  const hc = handCanvas;
+  hc.width  = camVideo.videoWidth  || 160;
+  hc.height = camVideo.videoHeight || 120;
+  const ctx = hc.getContext('2d');
+  ctx.clearRect(0,0,hc.width,hc.height);
+  if(!drawUtils) drawUtils = new DrawingUtils(ctx);
+  if(result.landmarks){
+    for(const lm of result.landmarks){
+      drawUtils.drawConnectors(lm, HandLandmarker.HAND_CONNECTIONS,
+        {color:'rgba(255,107,80,.8)', lineWidth:1.5});
+      drawUtils.drawLandmarks(lm,
+        {color:'#ffffff', lineWidth:1, radius:2});
+    }
+  }
+}
+
+function camTick(){
+  if(!camActive||!landmarker||camVideo.readyState<2){ rafId=requestAnimationFrame(camTick); return; }
+  let res;
+  try { res=landmarker.detectForVideo(camVideo, Date.now()); }
+  catch { rafId=requestAnimationFrame(camTick); return; }
+
+  drawHand(res);
+
+  if(res.landmarks?.length > 0){
+    const lm = res.landmarks[0];
+
+    // ── Normalized finger extension ───────────────────
+    // Negative = finger extended (tip above PIP), Positive = curled (tip below PIP)
+    const handSz = Math.hypot(lm[9].x-lm[0].x, lm[9].y-lm[0].y); // middle MCP → wrist
+    const ext = (tip, pip) => handSz > 0.01 ? (lm[tip].y - lm[pip].y) / handSz : 0;
+
+    // Per-finger states with dead zone
+    const idxUp   = ext(8,  6) < -DEAD_ZONE;
+    const idxDown = ext(8,  6) >  DEAD_ZONE;
+    const midUp   = ext(12,10) < -DEAD_ZONE;
+    const midDown = ext(12,10) >  DEAD_ZONE;
+    const rngUp   = ext(16,14) < -DEAD_ZONE;
+    const rngDown = ext(16,14) >  DEAD_ZONE;
+    const pkyUp   = ext(20,18) < -DEAD_ZONE;
+    const pkyDown = ext(20,18) >  DEAD_ZONE;
+    const thumbDown = ext(4, 3) > DEAD_ZONE;
+
+    const fourUp   = idxUp && midUp && rngUp && pkyUp;
+    const fourDown = idxDown && midDown && rngDown && pkyDown;
+    const victory  = idxUp && midUp && rngDown && pkyDown;
+    const threeUp  = idxUp && midUp && rngUp && pkyDown;   // 🖐️ index+mid+ring up, pinky down
+
+    // ── Classify — context-dependent when overlay open ──
+    let det = 'none';
+    if (fourDown) {
+      det = (overlayOpen) ? 'close' : 'fist';       // ✊ overlay→关闭 / 散开→聚合
+    } else if (threeUp && overlayOpen) {
+      det = 'next';                                  // 🖐️ 3 fingers → 换照片
+    } else if (victory) {
+      det = 'victory';                               // ✌️ → 放大
+    } else if (fourUp) {
+      det = 'open';                                  // ✋ → 散开
+    }
+
+    // ── Frame-count hold before trigger ───────────────
+    const now = Date.now();
+    if (det !== gState.name) {
+      gState = { name:det, frames:0, fired:false };
+    } else {
+      gState.frames++;
+    }
+
+    // Show real-time label
+    const labels  = { fist:'✊', open:'✋', victory:'✌️', close:'✊ 关闭', next:'🖐️ 换图', none:'' };
+    gLabel.textContent = labels[det];
+    gLabel.style.opacity = det === 'none' ? '0.35' : '1';
+
+    // Only trigger if held long enough and not fired yet
+    // close/next ignore global cooldown — respond immediately
+    const coolOk = (now > coolUntil) || det === 'close' || det === 'next';
+    if (gState.frames >= HOLD_FRAMES && !gState.fired && coolOk) {
+      gState.fired = true;
+
+      if (det === 'fist' && scattered) {
+        setGather();
+        gLabel.textContent = '✊ 聚合';
+        coolUntil = now + 800;
+      }
+      if (det === 'open' && !scattered) {
+        setScatter();
+        gLabel.textContent = '✋ 散开';
+        coolUntil = now + 800;
+      }
+      if (det === 'victory' && !overlayOpen) {
+        showPhoto(currentIdx);
+        gLabel.textContent = '✌️ 放大';
+        coolUntil = now + 800;
+      }
+      if (det === 'close' && overlayOpen) {
+        hidePhoto();
+        gLabel.textContent = '✊ 关闭';
+        coolUntil = now + 300;
+      }
+      if (det === 'next' && overlayOpen) {
+        nextPhoto();
+        gLabel.textContent = '🖐️ 换图';
+        coolUntil = now + 300;
+      }
+    }
+
+    // ── Victory release → next photo ──────────────────
+    if (det !== 'victory' && isVSign) {
+      isVSign = false;
+      if (overlayOpen && !vSignCool && det !== 'close' && det !== 'next') {
+        vSignCool = true;
+        nextPhoto();
+        setTimeout(()=>{ vSignCool=false; }, 1200);
+      }
+    }
+    if (det === 'victory' && !isVSign) isVSign = true;
+
+    // ── Fist closes photo → cancel victory state ───────
+    if (det === 'close') { isVSign = false; }
+
+    // ── Reset overlay zoom when not zoomed ────────────
+    if (overlayOpen) {
+      targetOZoom = 1.0;
+    }
+  } else {
+    if (isVSign) { isVSign = false; }
+    gState = { name:'none', frames:0, fired:false };
+    gLabel.textContent = '等待手势…';
+    gLabel.style.opacity = '0.35';
+  }
+
+  rafId = requestAnimationFrame(camTick);
+}
+
+async function startCam(){
+  if(!canUseCamera){
+    gLabel.textContent = '摄像头需要 HTTPS 或 localhost';
+    return;
+  }
+
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({video:{width:320,height:240,facingMode:'user'}});
+    camVideo.srcObject = s;
+    await camVideo.play();
+    if(!landmarker) await initLandmarker();
+    camActive = true;
+    camTick();
+  } catch { gLabel.textContent='无法访问摄像头'; }
+}
+
+function stopCam(){
+  camActive = false;
+  if(rafId){ cancelAnimationFrame(rafId); rafId=null; }
+  camVideo.srcObject?.getTracks().forEach(t=>t.stop());
+  camVideo.srcObject = null;
+  isVSign = false;
+  targetOZoom = 1.0; overlayZoom = 1.0;
+  gState = { name:'none', frames:0, fired:false };
+  const ctx = handCanvas.getContext('2d');
+  ctx.clearRect(0,0,handCanvas.width,handCanvas.height);
+}
+
+camBtn.addEventListener('click', ()=>{
+  if(!camActive){ camBtn.classList.add('on'); camPanel.classList.add('on'); startCam(); }
+  else          { camBtn.classList.remove('on'); camPanel.classList.remove('on'); stopCam(); }
+});
+
+</script>
+</body>
+</html>
