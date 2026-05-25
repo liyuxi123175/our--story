@@ -345,11 +345,12 @@ function showPhoto(idx){
   currentIdx = ((idx%photos.length)+photos.length)%photos.length;
   oImg.src   = photos[currentIdx];
   oCtr.textContent = `${String(currentIdx+1).padStart(2,'0')} / ${String(photos.length).padStart(2,'0')}`;
+  oInner.style.transform = '';
   overlayEl.classList.add('show');
   overlayOpen = true;
 }
-function hidePhoto(){ overlayEl.classList.remove('show'); overlayOpen=false; targetOZoom=1.0; overlayZoom=1.0; oInner.style.transform='scale(1)'; }
-function nextPhoto(){ hidePhoto(); setTimeout(()=>showPhoto(currentIdx+1), 300); }
+function hidePhoto(){ overlayEl.classList.remove('show'); overlayOpen=false; targetOZoom=1.0; overlayZoom=1.0; oInner.style.transform=''; }
+function nextPhoto(){ hidePhoto(); setTimeout(()=>showPhoto(currentIdx+1), 450); }
 
 overlayEl.addEventListener('click', e=>{ if(e.target!==oImg) hidePhoto(); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') hidePhoto(); });
@@ -460,10 +461,10 @@ updateSiteNote();
 
 let landmarker=null, camActive=false, rafId=null;
 let drawUtils=null;
-let isVSign=false, vSignCool=false;
 
 // Gesture debounce with frame-count hold
 const HOLD_FRAMES = 10;       // must hold gesture ~0.33s before trigger
+const CLOSE_HOLD_FRAMES = 3;  // make close easier when a photo is enlarged
 const DEAD_ZONE   = 0.07;     // normalized dead zone for finger extension
 let gState  = { name:'none', frames:0, fired:false };
 let coolUntil = 0;            // timestamp cooldown after trigger
@@ -527,17 +528,19 @@ function camTick(){
     const rngDown = ext(16,14) >  DEAD_ZONE;
     const pkyUp   = ext(20,18) < -DEAD_ZONE;
     const pkyDown = ext(20,18) >  DEAD_ZONE;
-    const thumbDown = ext(4, 3) > DEAD_ZONE;
-
     const fourUp   = idxUp && midUp && rngUp && pkyUp;
     const fourDown = idxDown && midDown && rngDown && pkyDown;
     const victory  = idxUp && midUp && rngDown && pkyDown;
     const threeUp  = idxUp && midUp && rngUp && pkyDown;   // 🖐️ index+mid+ring up, pinky down
+    // Overlay close is intentionally more permissive than the gather fist.
+    const closeFist = idxDown && midDown && (rngDown || pkyDown || (!rngUp && !pkyUp));
 
     // ── Classify — context-dependent when overlay open ──
     let det = 'none';
-    if (fourDown) {
-      det = (overlayOpen) ? 'close' : 'fist';       // ✊ overlay→关闭 / 散开→聚合
+    if (overlayOpen && closeFist) {
+      det = 'close';                                // ✊ overlay→关闭
+    } else if (fourDown) {
+      det = 'fist';                                 // ✊ 散开→聚合
     } else if (threeUp && overlayOpen) {
       det = 'next';                                  // 🖐️ 3 fingers → 换照片
     } else if (victory) {
@@ -560,9 +563,10 @@ function camTick(){
     gLabel.style.opacity = det === 'none' ? '0.35' : '1';
 
     // Only trigger if held long enough and not fired yet
-    // close/next ignore global cooldown — respond immediately
-    const coolOk = (now > coolUntil) || det === 'close' || det === 'next';
-    if (gState.frames >= HOLD_FRAMES && !gState.fired && coolOk) {
+    // close ignores the global cooldown so enlarged photos can shut promptly
+    const coolOk = (now > coolUntil) || det === 'close';
+    const holdFramesNeeded = det === 'close' ? CLOSE_HOLD_FRAMES : HOLD_FRAMES;
+    if (gState.frames >= holdFramesNeeded && !gState.fired && coolOk) {
       gState.fired = true;
 
       if (det === 'fist' && scattered) {
@@ -588,30 +592,15 @@ function camTick(){
       if (det === 'next' && overlayOpen) {
         nextPhoto();
         gLabel.textContent = '🖐️ 换图';
-        coolUntil = now + 300;
+        coolUntil = now + 1200;
       }
     }
-
-    // ── Victory release → next photo ──────────────────
-    if (det !== 'victory' && isVSign) {
-      isVSign = false;
-      if (overlayOpen && !vSignCool && det !== 'close' && det !== 'next') {
-        vSignCool = true;
-        nextPhoto();
-        setTimeout(()=>{ vSignCool=false; }, 1200);
-      }
-    }
-    if (det === 'victory' && !isVSign) isVSign = true;
-
-    // ── Fist closes photo → cancel victory state ───────
-    if (det === 'close') { isVSign = false; }
 
     // ── Reset overlay zoom when not zoomed ────────────
     if (overlayOpen) {
       targetOZoom = 1.0;
     }
   } else {
-    if (isVSign) { isVSign = false; }
     gState = { name:'none', frames:0, fired:false };
     gLabel.textContent = '等待手势…';
     gLabel.style.opacity = '0.35';
@@ -641,7 +630,6 @@ function stopCam(){
   if(rafId){ cancelAnimationFrame(rafId); rafId=null; }
   camVideo.srcObject?.getTracks().forEach(t=>t.stop());
   camVideo.srcObject = null;
-  isVSign = false;
   targetOZoom = 1.0; overlayZoom = 1.0;
   gState = { name:'none', frames:0, fired:false };
   const ctx = handCanvas.getContext('2d');
